@@ -12,11 +12,11 @@ let colors = ['black','white','orange','yellow','red','cyan','purple','grey'];
 let board = [];
 let updateBoard = [];
 let timer = 0;
-let pauseGame = true;
+let pauseGame = false;
 let boardWidth  = 21;
 let boardHeight = 21;
 let finished = false;
-let lastPassage = [[0,0]];
+let lastPassage = [];
 let includeDiags = false;
 function setup() {    
     createCanvas(windowWidth, windowHeight);    
@@ -30,8 +30,13 @@ function setup() {
         }
         board.push(inner);
     }
-    board[0][0].value = 4;
-    board[14][16].value = 6;
+    let SX = Math.floor(Math.random() * boardWidth /2) * 2;
+    let SY = Math.floor(Math.random() * boardHeight/2) * 2;
+    let FX = Math.floor(Math.random() * boardWidth /2) * 2;
+    let FY = Math.floor(Math.random() * boardHeight/2) * 2;
+    board[SX][SY].value = 4;
+    lastPassage.push([SX,SY]);
+    board[FX][FY].value = 6;
 }
 function carve_passages_from(pos){
     queueNeighbour([pos[0],pos[1]],1);
