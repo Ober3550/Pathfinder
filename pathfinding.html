@@ -8,14 +8,16 @@ function Node(pos,value) {
     this.value = value;
     this.parent = null;
 }
-let colors = ['black','white','orange','yellow','red','cyan','purple'];
+let colors = ['black','white','orange','yellow','red','cyan','purple','grey'];
 let board = [];
 let updateBoard = [];
 let timer = 0;
-let pauseGame = false;
-let boardWidth  = 100;
-let boardHeight = 100;
+let pauseGame = true;
+let boardWidth  = 21;
+let boardHeight = 21;
 let finished = false;
+let lastPassage = [[0,0]];
+let includeDiags = false;
 function setup() {    
     createCanvas(windowWidth, windowHeight);    
     background(255);
@@ -24,21 +26,33 @@ function setup() {
     for(let i=0;i<boardWidth;i++){
         let inner = [];
         for(let j=0;j<boardHeight;j++){    
-            inner.push(new Node([i,j],1));
+            inner.push(new Node([i,j],0));
         }
         board.push(inner);
     }
-    board[0][3].value = 4;
-    board[30][40].value = 5;
-    // Vertical wall
-    for(let i=0;i<40;i++)
-    {
-        board[10][i+10].value = 0;
+    board[0][0].value = 4;
+    board[14][16].value = 6;
+}
+function carve_passages_from(pos){
+    queueNeighbour([pos[0],pos[1]],1);
+    // Shuffle array
+    for(let i=orth.length-1;i>0;i--){
+        let j = Math.floor(Math.random() * i)
+        let temp = orth[i]
+        orth[i] = orth[j]
+        orth[j] = temp
     }
-    for(let i=0;i<40;i++)
-    {
-        board[i+5][30].value = 0;
+    // Randomly check if a passage can be made
+    for(let i=0;i<orth.length;i++){
+        let neighbourPos = [pos[0]+orth[i][0]*2,pos[1]+orth[i][1]*2];
+        let neighbour = getNeighbour(neighbourPos);
+        if(neighbour == 0 || neighbour == 6){
+            queueNeighbour([pos[0]+orth[i][0],pos[1]+orth[i][1]],1);
+            lastPassage.push(neighbourPos);
+            return;
+        }
     }
+    lastPassage.pop();
 }
 // Safety function so that 
 // index out of bounds doesn't occur
@@ -49,7 +63,7 @@ function getNeighbour(pos){
     pos[1] < 0 || 
     pos[1] >= boardHeight
     )
-        return 0;
+        return 7;
     return board[pos[0]][pos[1]].value;
 }
 function queueNeighbour(pos,value){
@@ -63,7 +77,11 @@ function setNeighbour(pos, value){
     pos[1] >= boardHeight
     )
         return;
+    let currValue = board[pos[0]][pos[1]].value;
+    if(currValue != 4 && currValue != 5)
     board[pos[0]][pos[1]].value = value;
+    if(currValue == 6)
+    board[pos[0]][pos[1]].value = 5;
 }
 function findRoute(node){
     if(node.parent != null)
@@ -96,7 +114,11 @@ function stepGame(){
     timer++;
     if(timer == 1){
         timer = 0;
-        if(!finished){
+        // Treat the array like a stack since it's 'recursive'
+        if(lastPassage.length > 0){
+            carve_passages_from(lastPassage[lastPassage.length-1]);
+        }
+        else if(!finished){
             for(let i=0;i<boardWidth;i++){
                 for(let j=0;j<boardHeight;j++)
                 {
@@ -116,36 +138,35 @@ function stepGame(){
                         }
                         if(breakall) break;
                         // Diagonal checks
-                        for(let o=0;o<4;o++){
-                            // Check if finished
-                            if(getNeighbour([i+diag[o][0],j+diag[o][1]]) == 5){
-                                finish(i,j);
-                                breakall = true;
-                                break;
+                        if(includeDiags){
+                            for(let o=0;o<4;o++){
+                                // Check if finished
+                                if(getNeighbour([i+diag[o][0],j+diag[o][1]]) == 5){
+                                    finish(i,j);
+                                    breakall = true;
+                                    break;
+                                }
+                                // Extra functionality is to ensure that nodes don't 
+                                // take their neighbours tile in case of a diagonal
+                                if(getNeighbour([i+diag[o][0],j+diag[o][1]]) == 1 &&
+                                   getNeighbour([i           ,j+diag[o][1]]) != 2 &&
+                                   getNeighbour([i+diag[o][0],j           ]) != 2)
+                                {
+                                    queueNeighbour([i+diag[o][0],j+diag[o][1]],2); 
+                                    board[i+diag[o][0]][j+diag[o][1]].parent = board[i][j]; 
+                                }
                             }
-                            // Extra functionality is to ensure that nodes don't 
-                            // take their neighbours tile in case of a diagonal
-                            if(getNeighbour([i+diag[o][0],j+diag[o][1]]) == 1 &&
-                               getNeighbour([i           ,j+diag[o][1]]) != 2 &&
-                               getNeighbour([i+diag[o][0],j           ]) != 2)
-                            {
-                                queueNeighbour([i+diag[o][0],j+diag[o][1]],2); 
-                                board[i+diag[o][0]][j+diag[o][1]].parent = board[i][j]; 
-                            }
+                            if(breakall) break;
                         }
-                        if(breakall) break;
-                        // Don't change color if it's the start
-                        if(board[i][j].value == 2){
-                            queueNeighbour([i,j],3);
-                        }
+                        queueNeighbour([i,j],3);
                     }
                 }
             }
-            for(let i=0;i<updateBoard.length;i++){
-                setNeighbour(updateBoard[i][0],updateBoard[i][1]);
-            }
-            updateBoard = [];
         }
+        for(let i=0;i<updateBoard.length;i++){
+            setNeighbour(updateBoard[i][0],updateBoard[i][1]);
+        }
+        updateBoard = [];
     }
 }
 function draw() {
@@ -162,6 +183,13 @@ function draw() {
         for(let j=0;j<board[i].length;j++)
         {
             fill(colors[board[i][j].value]);
+            if(lastPassage.length > 0){
+                let runner = lastPassage[lastPassage.length-1];
+                if(runner[0] == i && runner[1] == j)
+                {
+                    fill('red');
+                }
+            }
             rect(xOff+i*stepSize,j*stepSize,stepSize,stepSize);
         }
     }
